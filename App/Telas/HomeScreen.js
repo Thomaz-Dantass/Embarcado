@@ -9,10 +9,9 @@ const client = new Paho.Client('10.44.1.35', 9001, '/');
 export default function HomeScreen() {
   const [mostrarGraficos, setMostrarGraficos] = useState(false);
   const [voltage, setVoltage] = useState([]); // Agora é um array para armazenar os valores da tensão
-  const [current, setCurrent] = useState();
+  const [current, setCurrent] = useState([]);  // Agora é um array para armazenar os valores de corrente
 
   // Dados fixos para os gráficos
-  const correnteData = [5, 5.5, 5.2, 5.8, 6, 5.7];
   const curvaIVData = [6.5, 6.3, 6.0, 5.7, 5.2, 4.5, 3.5, 0];
 
   useEffect(() => {
@@ -21,10 +20,21 @@ export default function HomeScreen() {
         setVoltage((prevVoltage) => {
           const newVoltage = parseFloat(message.payloadString);
           // Mantém os 6 últimos valores de tensão
-          if (prevVoltage.length >= 6) {
+          if (prevVoltage.length >= 200) {
             return [...prevVoltage.slice(1), newVoltage];
           }
           return [...prevVoltage, newVoltage];
+        });
+      }
+
+      if (message.destinationName === 'esp32/current') {
+        setCurrent((prevCurrent) => {
+          const newCurrent = parseFloat(message.payloadString);
+          // Mantém os 6 últimos valores de corrente
+          if (prevCurrent.length >= 200) {
+            return [...prevCurrent.slice(1), newCurrent];
+          }
+          return [...prevCurrent, newCurrent];
         });
       }
     };
@@ -32,6 +42,7 @@ export default function HomeScreen() {
     const onConnect = () => {
       console.log("Conexão bem-sucedida!");
       client.subscribe('esp32/voltage');
+      client.subscribe('esp32/current');
     };
 
     client.connect({ onSuccess: onConnect });
@@ -47,7 +58,7 @@ export default function HomeScreen() {
       const message = new Paho.Message("on");
       message.destinationName = "esp01/led";
       client.send(message);
-      console.log("enviado")
+      console.log("enviado");
       setMostrarGraficos(true);
     } catch (error) {
       console.error("Erro ao enviar comando:", error);
@@ -73,7 +84,7 @@ export default function HomeScreen() {
               Tensão: {voltage.length > 0 ? `${voltage[voltage.length - 1].toFixed(2)} V` : '--'}
             </Text>
             <Text style={styles.dataText}>
-              Corrente: {current ? `${current.toFixed(2)} A` : '--'}
+              Corrente: {current.length > 0 ? `${current[current.length - 1].toFixed(2)} A` : '--'}
             </Text>
           </View>
 
@@ -82,7 +93,9 @@ export default function HomeScreen() {
           <LineChart
             data={{
               labels: ['0s', '1s', '2s', '3s', '4s', '5s'],
-              datasets: [{ data: voltage }],
+              datasets: [{
+                data: voltage.length > 0 ? voltage : [0, 0, 0, 0, 0, 0], // Atualiza com os dados da voltagem
+              }],
             }}
             width={screenWidth - 20}
             height={220}
@@ -96,7 +109,9 @@ export default function HomeScreen() {
           <LineChart
             data={{
               labels: ['0s', '1s', '2s', '3s', '4s', '5s'],
-              datasets: [{ data: correnteData }],
+              datasets: [{
+                data: current.length > 0 ? current : [0, 0, 0, 0, 0, 0], // Atualiza com os dados da corrente
+              }],
             }}
             width={screenWidth - 20}
             height={220}
