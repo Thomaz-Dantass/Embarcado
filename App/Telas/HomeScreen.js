@@ -1,35 +1,88 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ScrollView } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
+import Paho from 'paho-mqtt';
 
 const screenWidth = Dimensions.get('window').width;
+const client = new Paho.Client('10.44.1.35', 9001, '/');
 
 export default function HomeScreen() {
   const [mostrarGraficos, setMostrarGraficos] = useState(false);
+  const [voltage, setVoltage] = useState([]); // Agora é um array para armazenar os valores da tensão
+  const [current, setCurrent] = useState();
 
   // Dados fixos para os gráficos
-  const tensaoData = [30, 32, 31, 33, 35, 34];
   const correnteData = [5, 5.5, 5.2, 5.8, 6, 5.7];
   const curvaIVData = [6.5, 6.3, 6.0, 5.7, 5.2, 4.5, 3.5, 0];
 
+  useEffect(() => {
+    const onMessageArrived = (message) => {
+      if (message.destinationName === 'esp32/voltage') {
+        setVoltage((prevVoltage) => {
+          const newVoltage = parseFloat(message.payloadString);
+          // Mantém os 6 últimos valores de tensão
+          if (prevVoltage.length >= 6) {
+            return [...prevVoltage.slice(1), newVoltage];
+          }
+          return [...prevVoltage, newVoltage];
+        });
+      }
+    };
+
+    const onConnect = () => {
+      console.log("Conexão bem-sucedida!");
+      client.subscribe('esp32/voltage');
+    };
+
+    client.connect({ onSuccess: onConnect });
+    client.onMessageArrived = onMessageArrived;
+
+    return () => {
+      client.disconnect();
+    };
+  }, []);
+
+  const handleStart = () => {
+    try {
+      const message = new Paho.Message("on");
+      message.destinationName = "esp01/led";
+      client.send(message);
+      console.log("enviado")
+      setMostrarGraficos(true);
+    } catch (error) {
+      console.error("Erro ao enviar comando:", error);
+    }
+  };
+
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Gráficos de Linha</Text>
+      <Text style={styles.title}>Monitoramento Solar</Text>
+      
       {!mostrarGraficos ? (
         <TouchableOpacity 
           style={styles.button}
-          onPress={() => setMostrarGraficos(true)}
+          onPress={handleStart}
         >
-          <Text style={styles.buttonText}>Iniciar</Text>
+          <Text style={styles.buttonText}>Iniciar Teste</Text>
         </TouchableOpacity>
       ) : (
         <>
-          {/* Gráfico 1 - Tensão ao longo do tempo */}
-          <Text style={styles.chartTitle}>Tensão ao longo do tempo</Text>
+          {/* Dados em tempo real */}
+          <View style={styles.realTimeData}>
+            <Text style={styles.dataText}>
+              Tensão: {voltage.length > 0 ? `${voltage[voltage.length - 1].toFixed(2)} V` : '--'}
+            </Text>
+            <Text style={styles.dataText}>
+              Corrente: {current ? `${current.toFixed(2)} A` : '--'}
+            </Text>
+          </View>
+
+          {/* Gráfico 1 - Tensão */}
+          <Text style={styles.chartTitle}>Tensão ao Longo do Tempo</Text>
           <LineChart
             data={{
               labels: ['0s', '1s', '2s', '3s', '4s', '5s'],
-              datasets: [{ data: tensaoData }],
+              datasets: [{ data: voltage }],
             }}
             width={screenWidth - 20}
             height={220}
@@ -38,8 +91,8 @@ export default function HomeScreen() {
             style={styles.chart}
           />
 
-          {/* Gráfico 2 - Corrente ao longo do tempo */}
-          <Text style={styles.chartTitle}>Corrente ao longo do tempo</Text>
+          {/* Gráfico 2 - Corrente */}
+          <Text style={styles.chartTitle}>Corrente ao Longo do Tempo</Text>
           <LineChart
             data={{
               labels: ['0s', '1s', '2s', '3s', '4s', '5s'],
@@ -52,7 +105,7 @@ export default function HomeScreen() {
             style={styles.chart}
           />
 
-          {/* Gráfico 3 - Curva IV do painel solar */}
+          {/* Gráfico 3 - Curva IV */}
           <Text style={styles.chartTitle}>Curva IV do Painel Solar</Text>
           <LineChart
             data={{
@@ -93,33 +146,52 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginTop: 50,
+    marginVertical: 20,
   },
   chartTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
     marginLeft: 10,
     marginBottom: 5,
+    color: '#333',
   },
   chart: {
     marginVertical: 10,
     borderRadius: 16,
     alignSelf: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-
   button: {
-    width: 211,
-    height: 58,
-    borderRadius: 25,
-    backgroundColor: '#6EC1E4',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 300,
-    marginLeft: 90,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    borderRadius: 30,
+    alignSelf: 'center',
+    marginTop: 50,
+    elevation: 3,
   },
   buttonText: {
     color: '#FFF',
     fontSize: 18,
     fontWeight: 'bold',
+    letterSpacing: 1,
+  },
+  realTimeData: {
+    margin: 20,
+    padding: 15,
+    backgroundColor: '#FFF',
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  dataText: {
+    fontSize: 16,
+    marginVertical: 5,
+    color: '#666',
   },
 });
