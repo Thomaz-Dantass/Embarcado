@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ScrollView } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
+import Paho from 'paho-mqtt';
+
 
 const screenWidth = Dimensions.get('window').width;
+const client = new Paho.Client('10.44.1.35', 9001, '/');
+
 
 export default function HomeScreen() {
   const [mostrarGraficos, setMostrarGraficos] = useState(false);
@@ -11,6 +15,32 @@ export default function HomeScreen() {
   const tensaoData = [30, 32, 31, 33, 35, 34];
   const correnteData = [5, 5.5, 5.2, 5.8, 6, 5.7];
   const curvaIVData = [6.5, 6.3, 6.0, 5.7, 5.2, 4.5, 3.5, 0];
+
+  const [voltage, setVoltage] = useState();
+  const [current, setCurrent] = useState();
+
+  useEffect(() => {
+    const onMessageArrived = (message) => {
+      if (message.destinationName === 'esp32/voltage') {
+        setVoltage(parseFloat(message.payloadString));
+      }
+    };
+
+    const onConnect = () => {
+      console.log("Conexão bem-sucedida!");
+      client.subscribe('esp32/voltage');
+    };
+
+    client.connect({ onSuccess: onConnect });
+    client.onMessageArrived = onMessageArrived;
+
+    console.log("dados: ",voltage)
+    return () => {
+      client.disconnect();
+    };
+  }, []);
+
+
 
   return (
     <ScrollView style={styles.container}>
