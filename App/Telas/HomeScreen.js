@@ -2,17 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ScrollView } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import Paho from 'paho-mqtt';
+import ScatterPlot from './ScatterPlot ';
 
 const screenWidth = Dimensions.get('window').width;
 const client = new Paho.Client('10.44.1.35', 9001, '/');
 
 export default function HomeScreen() {
   const [mostrarGraficos, setMostrarGraficos] = useState(false);
-  const [voltage, setVoltage] = useState([]); // Agora é um array para armazenar os valores da tensão
-  const [current, setCurrent] = useState([]);  // Agora é um array para armazenar os valores de corrente
-
-  // Dados fixos para os gráficos
-  const curvaIVData = [6.5, 6.3, 6.0, 5.7, 5.2, 4.5, 3.5, 0];
+  const [voltage, setVoltage] = useState([]);
+  const [current, setCurrent] = useState([]);
+  
 
   useEffect(() => {
     const onMessageArrived = (message) => {
@@ -50,6 +49,8 @@ export default function HomeScreen() {
 
     return () => {
       client.disconnect();
+      
+
     };
   }, []);
 
@@ -70,7 +71,7 @@ export default function HomeScreen() {
       <Text style={styles.title}>Monitoramento Solar</Text>
       
       {!mostrarGraficos ? (
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.button}
           onPress={handleStart}
         >
@@ -122,18 +123,8 @@ export default function HomeScreen() {
 
           {/* Gráfico 3 - Curva IV */}
           <Text style={styles.chartTitle}>Curva IV do Painel Solar</Text>
-          <LineChart
-            data={{
-              labels: ['0V', '5V', '10V', '15V', '20V', '25V', '30V', '35V'],
-              datasets: [{ data: curvaIVData }],
-            }}
-            width={screenWidth - 20}
-            height={220}
-            yAxisLabel="A"
-            xAxisLabel="V"
-            chartConfig={chartConfig}
-            style={styles.chart}
-          />
+          <ScatterPlot voltage={voltage} current={current} />
+
         </>
       )}
     </ScrollView>
@@ -209,4 +200,5 @@ const styles = StyleSheet.create({
     marginVertical: 5,
     color: '#666',
   },
+  curveChart: { height: 220, width: screenWidth - 20, alignSelf: 'center' },
 });
